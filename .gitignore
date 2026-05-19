@@ -1,0 +1,8 @@
+fix.py
+create_db.py
+venv/
+__pycache__/
+.pytest_cache/
+*.pyc
+.env
+tests/

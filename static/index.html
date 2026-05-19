@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Trivia Arena</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="panel join-panel" id="joinPanel">
+        <div>
+          <p class="eyebrow">Multiplayer Socket.IO Trivia</p>
+          <h1>Trivia Arena</h1>
+        </div>
+        <form id="joinForm" class="join-form">
+          <input id="nicknameInput" maxlength="32" autocomplete="nickname" placeholder="Choose nickname" required />
+          <button type="submit">Join Match</button>
+        </form>
+      </section>
+
+      <section class="game-layout hidden" id="gamePanel">
+        <section class="main-stage">
+          <div class="status-bar">
+            <div>
+              <p class="eyebrow" id="phaseLabel">Lobby</p>
+              <h2 id="mainTitle">Waiting for players</h2>
+            </div>
+            <div class="timer" id="timerBox">30</div>
+          </div>
+
+          <div class="lobby-view" id="lobbyView">
+            <p id="lobbyText">Matchmaking is open.</p>
+            <div class="chips" id="lobbyPlayers"></div>
+          </div>
+
+          <div class="category-view hidden" id="categoryView">
+            <div class="category-grid" id="categoryGrid"></div>
+            <p class="muted" id="voteSummary">No votes yet.</p>
+          </div>
+
+          <div class="question-view hidden" id="questionView">
+            <div class="question-meta">
+              <span id="questionCounter">Question 1 / 10</span>
+            </div>
+            <h3 id="questionText"></h3>
+            <div class="answers" id="answers"></div>
+            <div class="helps">
+              <button id="fiftyBtn" data-help="fifty_fifty" title="Remove two wrong answers">50/50</button>
+              <button id="friendBtn" data-help="call_friend" title="Ask a playful AI friend">Call Friend</button>
+              <button id="doubleBtn" data-help="double_score" title="Double this question's possible score">Double</button>
+            </div>
+            <p class="feedback" id="feedback"></p>
+          </div>
+
+          <div class="leaderboard-final hidden" id="finalView">
+            <h2 id="winnerText">Winner</h2>
+          </div>
+        </section>
+
+        <aside class="side-panel">
+          <section>
+            <h2>Leaderboard</h2>
+            <ol class="leaderboard" id="leaderboard"></ol>
+          </section>
+          <section class="chat-section">
+            <h2>Chat</h2>
+            <div class="chat-log" id="chatLog"></div>
+            <div class="emoji-row" id="emojiRow"></div>
+            <form class="chat-form" id="chatForm">
+              <input id="chatInput" maxlength="180" placeholder="Message players" />
+              <button type="submit">Send</button>
+            </form>
+          </section>
+        </aside>
+      </section>
+    </main>
+    <script src="/static/app.js"></script>
+  </body>
+</html>
