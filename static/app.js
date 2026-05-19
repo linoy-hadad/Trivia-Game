@@ -20,15 +20,22 @@ const answers = document.querySelector("#answers");
 const feedback = document.querySelector("#feedback");
 const leaderboard = document.querySelector("#leaderboard");
 const finalView = document.querySelector("#finalView");
-const winnerText = document.querySelector("#winnerText");
 const chatForm = document.querySelector("#chatForm");
 const chatInput = document.querySelector("#chatInput");
 const chatLog = document.querySelector("#chatLog");
 const emojiRow = document.querySelector("#emojiRow");
+const playAgainBtn = document.querySelector("#playAgainBtn");
+const scoreboardModal = document.querySelector("#scoreboardModal");
+const scoreboardCloseBtn = document.querySelector("#scoreboardCloseBtn");
+const winnerCaption = document.querySelector("#winnerCaption");
+const finalScoreboard = document.querySelector("#finalScoreboard");
+const answerPopup = document.querySelector("#answerPopup");
 
 let countdownInterval = null;
 let answered = false;
 let hiddenOptions = new Set();
+let lastAnswerResult = null;
+let popupTimeout = null;
 
 const helpButtons = {
   fifty_fifty: document.querySelector("#fiftyBtn"),
@@ -52,6 +59,7 @@ joinForm.addEventListener("submit", (event) => {
   socket.emit("join", { nickname });
   joinPanel.classList.add("hidden");
   gamePanel.classList.remove("hidden");
+  setPageState("lobby");
   showOnly(lobbyView);
 });
 
@@ -67,16 +75,24 @@ chatForm.addEventListener("submit", (event) => {
   chatInput.value = "";
 });
 
+scoreboardCloseBtn.addEventListener("click", () => {
+  scoreboardModal.classList.add("hidden");
+});
+
+playAgainBtn.addEventListener("click", resetToJoin);
+
 socket.on("lobby_update", (data) => {
+  setPageState("lobby");
   phaseLabel.textContent = "Lobby";
   mainTitle.textContent = "Waiting for players";
-  lobbyText.textContent = `${data.count} player${data.count === 1 ? "" : "s"} in matchmaking.`;
+  lobbyText.textContent = `${data.count} player${data.count === 1 ? "" : "s"} ${data.count === 1 ? "is" : "are"} in the game.`;
   lobbyPlayers.innerHTML = "";
   data.players.forEach((name) => lobbyPlayers.appendChild(chip(name)));
   startCountdown(data.seconds || 30);
 });
 
 socket.on("category_vote_started", (data) => {
+  setPageState("lobby");
   showOnly(categoryView);
   phaseLabel.textContent = "Category";
   mainTitle.textContent = "Pick the match category";
@@ -96,18 +112,22 @@ socket.on("category_vote_started", (data) => {
 socket.on("category_vote_update", (data) => renderVotes(data.votes || {}));
 
 socket.on("game_started", (data) => {
+  setPageState("question");
   showOnly(questionView);
   phaseLabel.textContent = data.category;
-  mainTitle.textContent = "Game started";
+  mainTitle.textContent = "Answer the question";
   renderLeaderboard(data.leaderboard || []);
 });
 
 socket.on("question_started", (data) => {
+  setPageState("question");
   showOnly(questionView);
   answered = false;
   hiddenOptions = new Set();
+  lastAnswerResult = null;
+  hideAnswerPopup();
   feedback.textContent = "";
-  mainTitle.textContent = data.question;
+  mainTitle.textContent = "Choose your answer";
   questionText.textContent = data.question;
   questionCounter.textContent = `Question ${data.questionNumber} / ${data.totalQuestions}`;
   startCountdown(data.timer);
@@ -116,7 +136,7 @@ socket.on("question_started", (data) => {
 });
 
 socket.on("answer_result", (data) => {
-  feedback.textContent = data.correct ? `Correct! +${data.points}` : "Not this time.";
+  lastAnswerResult = data;
 });
 
 socket.on("help_result", (data) => {
@@ -138,21 +158,26 @@ socket.on("question_ended", (data) => {
   stopCountdown();
   document.querySelectorAll(".answer-button").forEach((button) => {
     button.disabled = true;
-    if (button.dataset.optionId === data.correctOptionId) button.classList.add("correct");
+    if (button.dataset.optionId === data.correctOptionId) button.classList.add("correct", "blink-correct");
   });
-  feedback.textContent = `Correct answer: ${data.correctAnswer}`;
+  feedback.textContent = "";
+  if (lastAnswerResult) {
+    showAnswerPopup(lastAnswerResult.correct ? "Correct!" : "Not this time!");
+  }
   renderLeaderboard(data.leaderboard || []);
 });
 
 socket.on("scoreboard_update", (data) => renderLeaderboard(data.leaderboard || []));
 
 socket.on("game_ended", (data) => {
+  setPageState("final");
   showOnly(finalView);
   phaseLabel.textContent = "Final";
   mainTitle.textContent = "Game over";
-  timerBox.textContent = "🏆";
-  winnerText.textContent = data.winner ? `${data.winner.nickname} wins with ${data.winner.score}` : "Game ended";
+  timerBox.textContent = "0";
   renderLeaderboard(data.leaderboard || []);
+  renderFinalScoreboard(data.leaderboard || [], data.winner);
+  scoreboardModal.classList.remove("hidden");
 });
 
 socket.on("chat_message", (data) => addChatLine(`${data.nickname}: ${data.message}`));
@@ -202,15 +227,70 @@ function renderLeaderboard(rows) {
   leaderboard.innerHTML = "";
   rows.forEach((row) => {
     const item = document.createElement("li");
-    row.isBot = false;
-    item.innerHTML = `<span>${row.rank}. ${row.nickname}${row.isBot ? " · bot" : ""}</span><strong>${row.score}</strong>`;
+    item.innerHTML = `<span>${row.rank}. ${row.nickname}</span><strong>${row.score}</strong>`;
     leaderboard.appendChild(item);
+  });
+}
+
+function renderFinalScoreboard(rows, winner) {
+  const sortedRows = [...rows].sort((a, b) => b.score - a.score);
+  const winnerName = winner?.nickname || sortedRows[0]?.nickname || "Nobody";
+  winnerCaption.textContent = `${winnerName} is the winner!`;
+  finalScoreboard.innerHTML = "";
+  sortedRows.forEach((row, index) => {
+    const item = document.createElement("li");
+    item.innerHTML = `<span class="rank">${index + 1}</span><span>${row.nickname}</span><strong>${row.score}</strong>`;
+    finalScoreboard.appendChild(item);
   });
 }
 
 function showOnly(view) {
   [lobbyView, categoryView, questionView, finalView].forEach((element) => element.classList.add("hidden"));
   view.classList.remove("hidden");
+}
+
+function setPageState(state) {
+  document.body.classList.remove("state-join", "state-lobby", "state-question", "state-final");
+  document.body.classList.add(`state-${state}`);
+}
+
+function resetToJoin() {
+  stopCountdown();
+  hideAnswerPopup();
+  lastAnswerResult = null;
+  setPageState("join");
+  joinPanel.classList.remove("hidden");
+  gamePanel.classList.add("hidden");
+  scoreboardModal.classList.add("hidden");
+  showOnly(lobbyView);
+  nicknameInput.value = "";
+  chatInput.value = "";
+  chatLog.innerHTML = "";
+  leaderboard.innerHTML = "";
+  finalScoreboard.innerHTML = "";
+  feedback.textContent = "";
+  answers.innerHTML = "";
+  lobbyPlayers.innerHTML = "";
+  lobbyText.textContent = "Matchmaking is open.";
+  phaseLabel.textContent = "Lobby";
+  mainTitle.textContent = "Waiting for players";
+  timerBox.textContent = "30";
+}
+
+function showAnswerPopup(message) {
+  hideAnswerPopup();
+  answerPopup.textContent = message;
+  answerPopup.classList.remove("hidden");
+  popupTimeout = window.setTimeout(hideAnswerPopup, 2000);
+}
+
+function hideAnswerPopup() {
+  if (popupTimeout) {
+    window.clearTimeout(popupTimeout);
+    popupTimeout = null;
+  }
+  answerPopup.classList.add("hidden");
+  answerPopup.textContent = "";
 }
 
 function chip(text) {
