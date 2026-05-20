@@ -30,12 +30,31 @@ const scoreboardCloseBtn = document.querySelector("#scoreboardCloseBtn");
 const winnerCaption = document.querySelector("#winnerCaption");
 const finalScoreboard = document.querySelector("#finalScoreboard");
 const answerPopup = document.querySelector("#answerPopup");
+const finishGameBtn = document.querySelector("#finishGameBtn");
+const finishConfirmModal = document.querySelector("#finishConfirmModal");
+const finishYesBtn = document.querySelector("#finishYesBtn");
+const finishNoBtn = document.querySelector("#finishNoBtn");
+const muteBtn = document.querySelector("#muteBtn");
 
 let countdownInterval = null;
 let answered = false;
 let hiddenOptions = new Set();
 let lastAnswerResult = null;
 let popupTimeout = null;
+let soundEnabled = true;
+
+const sounds = {
+  music: new Audio("/static/assets/bg-music.mp3"),
+  wrong: new Audio("/static/assets/wrong-buzzer.mp3"),
+  correct: new Audio("/static/assets/correct-answer.mp3"),
+  good: new Audio("/static/assets/good-result.mp3"),
+};
+
+sounds.music.loop = true;
+sounds.music.volume = 0.28;
+sounds.wrong.volume = 0.9;
+sounds.correct.volume = 0.9;
+sounds.good.volume = 0.9;
 
 const helpButtons = {
   fifty_fifty: document.querySelector("#fiftyBtn"),
@@ -80,9 +99,26 @@ scoreboardCloseBtn.addEventListener("click", () => {
 });
 
 playAgainBtn.addEventListener("click", resetToJoin);
+finishGameBtn.addEventListener("click", () => finishConfirmModal.classList.remove("hidden"));
+finishNoBtn.addEventListener("click", () => finishConfirmModal.classList.add("hidden"));
+finishYesBtn.addEventListener("click", () => {
+  socket.emit("finish_game");
+  resetToJoin();
+});
+muteBtn.addEventListener("click", () => {
+  soundEnabled = !soundEnabled;
+  muteBtn.textContent = soundEnabled ? "Sound On" : "Sound Off";
+  muteBtn.setAttribute("aria-pressed", String(!soundEnabled));
+  if (!soundEnabled) {
+    stopBackgroundMusic();
+  } else if (document.body.classList.contains("state-question")) {
+    startBackgroundMusic();
+  }
+});
 
 socket.on("lobby_update", (data) => {
   setPageState("lobby");
+  finishGameBtn.classList.add("hidden");
   phaseLabel.textContent = "Lobby";
   mainTitle.textContent = "Waiting for players";
   lobbyText.textContent = `${data.count} player${data.count === 1 ? "" : "s"} ${data.count === 1 ? "is" : "are"} in the game.`;
@@ -94,8 +130,9 @@ socket.on("lobby_update", (data) => {
 socket.on("category_vote_started", (data) => {
   setPageState("lobby");
   showOnly(categoryView);
+  finishGameBtn.classList.remove("hidden");
   phaseLabel.textContent = "Category";
-  mainTitle.textContent = "Pick the match category";
+  mainTitle.textContent = "Pick your favorite category";
   startCountdown(data.seconds || 15);
   categoryGrid.innerHTML = "";
   data.categories.forEach((category) => {
@@ -114,6 +151,7 @@ socket.on("category_vote_update", (data) => renderVotes(data.votes || {}));
 socket.on("game_started", (data) => {
   setPageState("question");
   showOnly(questionView);
+  finishGameBtn.classList.remove("hidden");
   phaseLabel.textContent = data.category;
   mainTitle.textContent = "Answer the question";
   renderLeaderboard(data.leaderboard || []);
@@ -121,6 +159,7 @@ socket.on("game_started", (data) => {
 
 socket.on("question_started", (data) => {
   setPageState("question");
+  startBackgroundMusic();
   showOnly(questionView);
   answered = false;
   hiddenOptions = new Set();
@@ -162,7 +201,13 @@ socket.on("question_ended", (data) => {
   });
   feedback.textContent = "";
   if (lastAnswerResult) {
-    showAnswerPopup(lastAnswerResult.correct ? "Correct!" : "Not this time!");
+    if (lastAnswerResult.correct) {
+      playSound(sounds.correct);
+      showAnswerPopup("Correct!");
+    } else {
+      playSound(sounds.wrong);
+      showAnswerPopup("Not this time!");
+    }
   }
   renderLeaderboard(data.leaderboard || []);
 });
@@ -170,18 +215,22 @@ socket.on("question_ended", (data) => {
 socket.on("scoreboard_update", (data) => renderLeaderboard(data.leaderboard || []));
 
 socket.on("game_ended", (data) => {
+  stopBackgroundMusic();
   setPageState("final");
   showOnly(finalView);
+  finishGameBtn.classList.add("hidden");
   phaseLabel.textContent = "Final";
   mainTitle.textContent = "Game over";
   timerBox.textContent = "0";
   renderLeaderboard(data.leaderboard || []);
   renderFinalScoreboard(data.leaderboard || [], data.winner);
   scoreboardModal.classList.remove("hidden");
+  playSound(sounds.good);
 });
 
 socket.on("chat_message", (data) => addChatLine(`${data.nickname}: ${data.message}`));
 socket.on("emoji", (data) => addChatLine(`${data.nickname}: ${data.emoji}`));
+socket.on("finished_game", () => resetToJoin());
 socket.on("error_message", (data) => {
   feedback.textContent = data.message || "Something went wrong.";
 });
@@ -256,9 +305,12 @@ function setPageState(state) {
 
 function resetToJoin() {
   stopCountdown();
+  stopBackgroundMusic();
   hideAnswerPopup();
   lastAnswerResult = null;
   setPageState("join");
+  finishGameBtn.classList.add("hidden");
+  finishConfirmModal.classList.add("hidden");
   joinPanel.classList.remove("hidden");
   gamePanel.classList.add("hidden");
   scoreboardModal.classList.add("hidden");
@@ -275,6 +327,23 @@ function resetToJoin() {
   phaseLabel.textContent = "Lobby";
   mainTitle.textContent = "Waiting for players";
   timerBox.textContent = "30";
+}
+
+function startBackgroundMusic() {
+  if (!soundEnabled) return;
+  sounds.music.play().catch(() => {});
+}
+
+function stopBackgroundMusic() {
+  sounds.music.pause();
+  sounds.music.currentTime = 0;
+}
+
+function playSound(sound) {
+  if (!soundEnabled) return;
+  sound.pause();
+  sound.currentTime = 0;
+  sound.play().catch(() => {});
 }
 
 function showAnswerPopup(message) {

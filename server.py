@@ -26,6 +26,10 @@ async def join_room(sid: str, room: str) -> None:
     await sio.enter_room(sid, room)
 
 
+async def leave_room(sid: str, room: str) -> None:
+    await sio.leave_room(sid, room)
+
+
 engine = GameEngine(QuestionStore(BASE_DIR / "trivia.db"), emit, join_room)
 
 
@@ -76,3 +80,11 @@ async def chat_message(sid: str, data: dict[str, Any]) -> None:
 @sio.event
 async def emoji(sid: str, data: dict[str, Any]) -> None:
     await engine.emoji(sid, str(data.get("emoji", "")))
+
+
+@sio.event
+async def finish_game(sid: str) -> None:
+    room_id = await engine.leave_game(sid)
+    if room_id:
+        await leave_room(sid, room_id)
+    await sio.emit("finished_game", {}, room=sid)

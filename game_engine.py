@@ -92,6 +92,25 @@ class GameEngine:
                 room.players.pop(sid, None)
         await self._emit_lobby_update()
 
+    async def leave_game(self, sid: str) -> str | None:
+        async with self.lock:
+            self.waiting.pop(sid, None)
+            room_id = self.sid_to_room.pop(sid, None)
+            room = self.rooms.get(room_id or "")
+            if room:
+                room.players.pop(sid, None)
+                room.category_votes.pop(sid, None)
+                if room.current:
+                    room.current.answers.pop(sid, None)
+                if not any(not player.is_bot for player in room.players.values()):
+                    self.rooms.pop(room.id, None)
+                    return room.id
+
+        await self._emit_lobby_update()
+        if room and room.id in self.rooms:
+            await self.emit("scoreboard_update", {"leaderboard": self._leaderboard(room)}, room.id)
+        return room_id
+
     async def vote_category(self, sid: str, category: str) -> None:
         room = self._room_for_sid(sid)
         if not room or category not in CATEGORY_MAP or room.current:

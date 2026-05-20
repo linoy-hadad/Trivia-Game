@@ -26,12 +26,37 @@
               <p class="eyebrow" id="phaseLabel">Lobby</p>
               <h2 id="mainTitle">Waiting for players</h2>
             </div>
-            <div class="timer" id="timerBox">30</div>
+            <div class="status-actions">
+              <button id="muteBtn" class="mute-toggle" type="button" aria-pressed="false">Sound On</button>
+              <button id="finishGameBtn" class="finish-game hidden" type="button">Finish Game</button>
+              <div class="timer" id="timerBox">30</div>
+            </div>
           </div>
 
           <div class="lobby-view" id="lobbyView">
             <p id="lobbyText">Matchmaking is open.</p>
             <div class="chips" id="lobbyPlayers"></div>
+            <section class="rules-card">
+              <h3>Welcome to the Trivia Challenge! ✨</h3>
+              <p>You’re about to play a fast-paced trivia game with <strong>10 questions</strong>.</p>
+              <p>Your goal is simple: answer correctly and as quickly as possible to earn the highest score!</p>
+
+              <h4>How Scoring Works</h4>
+              <ul>
+                <li>✅ <strong>Correct answer:</strong> You earn points based on how fast you answer.</li>
+                <li>❌ <strong>Wrong answer:</strong> You get <strong>0 points</strong> for that question.</li>
+              </ul>
+              <p>The faster you answer correctly, the more points you’ll receive!</p>
+
+              <h4>Special Helpers</h4>
+              <p>🎯 <strong>50/50:</strong> Removes <strong>2 wrong answers</strong>, giving you a better chance to choose the correct one.</p>
+              <p>⚡ <strong>Double:</strong> Doubles the points for your current question. Use it wisely — it’s best when you’re confident in your answer!</p>
+              <p>📞 <strong>Call a Friend:</strong> Connects you with our game agent, allowing you to ask the question and receive assistance.</p>
+
+              <h4>Finish Anytime</h4>
+              <p>Want to stop early? Press the <strong>“Finish Game”</strong> button whenever you want.</p>
+              <p>Good luck, have fun, and aim for the top of the scoreboard! 🏆</p>
+            </section>
           </div>
 
           <div class="category-view hidden" id="categoryView">
@@ -79,13 +104,22 @@
     <section class="scoreboard-modal hidden" id="scoreboardModal" aria-modal="true" role="dialog">
       <div class="scoreboard-card">
         <button class="modal-close" id="scoreboardCloseBtn" type="button" aria-label="Close scoreboard">X</button>
-        <h2>Scoreboard</h2>
         <p id="winnerCaption">Winner is the winner!</p>
         <ol id="finalScoreboard" class="final-scoreboard"></ol>
       </div>
     </section>
 
     <div id="answerPopup" class="answer-popup hidden"></div>
+
+    <section class="confirm-modal hidden" id="finishConfirmModal" aria-modal="true" role="dialog">
+      <div class="confirm-card">
+        <p>Are you sure you want to end the game for you?</p>
+        <div class="confirm-actions">
+          <button id="finishYesBtn" type="button">Yes</button>
+          <button id="finishNoBtn" type="button">No</button>
+        </div>
+      </div>
+    </section>
 
     <script src="/static/app.js"></script>
   </body>
