@@ -3,8 +3,9 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta http-equiv="Cache-Control" content="no-store" />
     <title>Trivia Arena</title>
-    <link rel="stylesheet" href="/static/styles.css" />
+    <link rel="stylesheet" href="/static/styles.css?v=20260524-clock4" />
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
   </head>
   <body class="state-join">
@@ -29,7 +30,10 @@
             <div class="status-actions">
               <button id="muteBtn" class="mute-toggle" type="button" aria-pressed="false">Sound On</button>
               <button id="finishGameBtn" class="finish-game hidden" type="button">Finish Game</button>
-              <div class="timer" id="timerBox">30</div>
+              <div class="timer" id="timer">
+                <img class="timer-clock" src="/static/assets/trivia-clock.png" alt="" />
+                <span id="timerBox">30</span>
+              </div>
             </div>
           </div>
 
@@ -121,6 +125,32 @@
       </div>
     </section>
 
-    <script src="/static/app.js"></script>
+    <section class="confirm-modal hidden" id="finalChallengeModal" aria-modal="true" role="dialog">
+      <div class="confirm-card final-challenge-card">
+        <h2>⚠️ Final Challenge</h2>
+        <p>You’ve reached the end of the game… but this isn’t over yet.</p>
+        <p>You now have one final decision to make:</p>
+        <p>Do you want to take on the <strong>Final Challenge Question</strong>?</p>
+        <ul>
+          <li>You’ll have only <strong>10 seconds</strong> to answer.</li>
+          <li>If you answer correctly, your points for this question will be <strong>doubled</strong>.</li>
+          <li>A correct answer could completely change the leaderboard and turn you into the winner at the very last moment 👑</li>
+        </ul>
+        <p>But be warned — this is the hardest question yet.</p>
+        <p><strong>Choose carefully:</strong></p>
+        <ul>
+          <li>✅ <strong>YES</strong> — Show me the Final Challenge question.</li>
+          <li>❌ <strong>NO</strong> — Skip the challenge and move directly to the final scoreboard with your current score.</li>
+        </ul>
+        <p>This is your last chance to change everything!</p>
+        <p id="finalChallengeVotes" class="vote-summary">Votes: Yes 0 | No 0</p>
+        <div class="confirm-actions">
+          <button id="finalChallengeYesBtn" type="button">Yes</button>
+          <button id="finalChallengeNoBtn" type="button">No</button>
+        </div>
+      </div>
+    </section>
+
+    <script src="/static/app.js?v=20260524-clock4"></script>
   </body>
 </html>

@@ -36,7 +36,7 @@ body {
 }
 
 body.state-join {
-  background-image: url("/static/assets/join-bg.png");
+  background-image: url("/static/assets/opening-bg.png");
 }
 
 body.state-lobby {
@@ -134,18 +134,30 @@ input::placeholder {
 .game-layout {
   min-height: 100vh;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(280px, 330px);
-  gap: 18px;
+  grid-template-columns: minmax(0, 1fr) minmax(250px, 300px);
+  gap: 12px;
   align-items: stretch;
-  padding: 20px 0;
+  padding: 12px 0;
+}
+
+body.state-question .app-shell {
+  width: min(1080px, calc(100% - 18px));
+}
+
+body.state-question .game-layout {
+  min-height: 100vh;
+  grid-template-columns: minmax(0, 1fr) minmax(230px, 280px);
+  gap: 10px;
+  padding: 8px 0;
 }
 
 .main-stage,
 .side-panel {
+  position: relative;
   border: 2px solid rgba(255, 214, 235, 0.75);
-  border-radius: 22px;
+  border-radius: 18px;
   background: var(--glass);
-  box-shadow: var(--shadow);
+  box-shadow: 0 12px 30px rgba(128, 38, 78, 0.22);
   backdrop-filter: blur(5px);
 }
 
@@ -175,26 +187,27 @@ body.state-final .side-panel {
 
 .main-stage,
 .side-panel {
-  padding: clamp(14px, 2vw, 24px);
+  padding: clamp(10px, 1.5vw, 18px);
 }
 
 .status-bar {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  gap: 16px;
-  margin-bottom: clamp(16px, 3vh, 28px);
+  gap: 10px;
+  margin-bottom: clamp(10px, 1.8vh, 18px);
+  padding-right: 62px;
 }
 
 .status-actions {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
 }
 
 .finish-game {
-  min-height: 48px;
-  padding: 0 16px;
+  min-height: 38px;
+  padding: 0 12px;
   border-color: rgba(255, 120, 170, 0.95);
   background: linear-gradient(180deg, #fff2f7, #ff9ac2 60%, #ffc832);
   color: var(--pink-dark);
@@ -202,8 +215,8 @@ body.state-final .side-panel {
 }
 
 .mute-toggle {
-  min-height: 48px;
-  padding: 0 14px;
+  min-height: 38px;
+  padding: 0 12px;
   background: linear-gradient(180deg, #fff9d9, #ffc832 58%, #ff98bf);
   color: var(--pink-dark);
   white-space: nowrap;
@@ -216,7 +229,7 @@ body.state-lobby .side-panel section:first-child h2 {
 .status-bar h2 {
   margin: 0;
   max-width: 760px;
-  font-size: clamp(28px, 4vw, 58px);
+  font-size: clamp(22px, 3vw, 40px);
   line-height: 0.95;
   text-shadow: 0 2px 0 rgba(255, 255, 255, 0.68);
 }
@@ -224,28 +237,55 @@ body.state-lobby .side-panel section:first-child h2 {
 .eyebrow {
   margin: 0 0 6px;
   color: var(--pink-dark);
-  font-size: clamp(15px, 1.8vw, 21px);
+  font-size: clamp(13px, 1.4vw, 17px);
   text-transform: uppercase;
   letter-spacing: 0;
 }
 
 .timer {
-  width: clamp(64px, 8vw, 94px);
-  aspect-ratio: 1;
-  display: grid;
-  place-items: center;
-  flex: 0 0 auto;
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  width: 56px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+  flex: none;
+  filter: drop-shadow(0 8px 14px rgba(123, 38, 66, 0.28));
+  z-index: 2;
+}
+
+.timer-clock {
+  width: 100%;
+  height: auto;
+  max-height: 72px;
+  object-fit: contain;
+  display: block;
+}
+
+.timer span {
+  min-width: 34px;
+  margin-top: -4px;
+  padding: 1px 6px 2px;
+  border: 2px solid rgba(255, 213, 78, 0.95);
   border-radius: 999px;
-  border: 4px solid #ffe58a;
-  background: radial-gradient(circle at 35% 25%, #fff7bf, #ffc832 54%, #e75c9a);
-  box-shadow: inset 0 3px 0 rgba(255, 255, 255, 0.78), 0 8px 18px rgba(123, 38, 66, 0.28);
-  font-size: clamp(24px, 4vw, 42px);
+  background: rgba(255, 246, 196, 0.92);
+  color: var(--pink-dark);
+  box-shadow: 0 5px 12px rgba(123, 38, 66, 0.22);
+  font-size: 17px;
+  line-height: 1;
+  text-align: center;
+}
+
+.timer.is-ending .timer-clock {
+  animation: clockCountdown 0.55s ease-in-out infinite;
 }
 
 .lobby-view,
 .category-view,
 .question-view {
-  min-height: 58vh;
+  min-height: 50vh;
 }
 
 .lobby-view p,
@@ -325,43 +365,43 @@ body.state-lobby .side-panel section:first-child h2 {
 .question-meta {
   display: flex;
   justify-content: center;
-  margin-bottom: 10px;
-  font-size: clamp(18px, 2vw, 26px);
+  margin-bottom: 6px;
+  font-size: clamp(15px, 1.5vw, 20px);
 }
 
 #questionText {
-  width: min(980px, 100%);
-  margin: 0 auto clamp(20px, 4vh, 36px);
-  padding: clamp(14px, 2vw, 22px);
+  width: min(820px, 100%);
+  margin: 0 auto clamp(12px, 2vh, 18px);
+  padding: clamp(10px, 1.3vw, 15px);
   border: 2px solid rgba(255, 220, 122, 0.85);
   border-radius: 20px;
   background: rgba(255, 236, 221, 0.78);
   box-shadow: var(--shadow);
-  font-size: clamp(24px, 3.7vw, 54px);
-  line-height: 1.02;
+  font-size: clamp(21px, 2.8vw, 36px);
+  line-height: 1.04;
   text-align: center;
 }
 
 .answers {
-  width: min(920px, 100%);
+  width: min(800px, 100%);
   margin: 0 auto;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: clamp(10px, 2vw, 18px);
+  gap: clamp(8px, 1.2vw, 12px);
 }
 
 .answer-button {
-  min-height: clamp(66px, 10vh, 94px);
-  padding: 12px 16px;
-  border-radius: 18px;
-  font-size: clamp(18px, 2.2vw, 30px);
+  min-height: clamp(50px, 7vh, 68px);
+  padding: 8px 12px;
+  border-radius: 14px;
+  font-size: clamp(16px, 1.7vw, 22px);
   line-height: 1.05;
   text-align: center;
   overflow-wrap: anywhere;
 }
 
 .answer-button.selected {
-  outline: 4px solid rgba(255, 255, 255, 0.95);
+  outline: 3px solid rgba(255, 255, 255, 0.95);
 }
 
 .answer-button.correct {
@@ -377,17 +417,18 @@ body.state-lobby .side-panel section:first-child h2 {
 }
 
 .helps {
-  width: min(920px, 100%);
-  margin: 18px auto 0;
+  width: min(800px, 100%);
+  margin: 10px auto 0;
   display: flex;
-  gap: 10px;
+  gap: 8px;
   flex-wrap: wrap;
   justify-content: center;
 }
 
 .helps button,
 .chat-form button {
-  padding: 0 16px;
+  min-height: 36px;
+  padding: 0 12px;
 }
 
 .helps .used {
@@ -395,21 +436,21 @@ body.state-lobby .side-panel section:first-child h2 {
 }
 
 .feedback {
-  min-height: 34px;
+  min-height: 24px;
   text-align: center;
   color: var(--pink-dark);
 }
 
 .side-panel {
   display: grid;
-  gap: 18px;
+  gap: 10px;
   align-content: start;
   background: rgba(255, 230, 238, 0.82);
 }
 
 .side-panel h2 {
-  margin: 0 0 10px;
-  font-size: clamp(22px, 2.6vw, 34px);
+  margin: 0 0 6px;
+  font-size: clamp(18px, 2vw, 26px);
   text-align: center;
 }
 
@@ -424,40 +465,41 @@ body.state-lobby .side-panel section:first-child h2 {
 .final-scoreboard li {
   display: grid;
   grid-template-columns: 1fr auto;
-  gap: 12px;
+  gap: 8px;
   align-items: center;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
   border: 2px solid rgba(255, 203, 54, 0.86);
-  border-radius: 14px;
+  border-radius: 12px;
   background: rgba(255, 246, 196, 0.78);
-  padding: 9px 12px;
-  font-size: 20px;
+  padding: 7px 9px;
+  font-size: 17px;
 }
 
 .chat-log {
-  height: min(28vh, 260px);
+  height: min(23vh, 190px);
   overflow: auto;
   border: 2px solid rgba(255, 203, 54, 0.86);
-  border-radius: 14px;
-  padding: 10px;
+  border-radius: 12px;
+  padding: 8px;
   background: rgba(255, 255, 255, 0.74);
 }
 
 .chat-line {
-  padding: 6px 0;
+  padding: 4px 0;
+  font-size: 15px;
   border-bottom: 1px solid rgba(187, 78, 118, 0.18);
 }
 
 .emoji-row {
   display: flex;
-  gap: 6px;
+  gap: 5px;
   flex-wrap: wrap;
-  margin: 10px 0;
+  margin: 6px 0;
 }
 
 .emoji-button {
-  width: 38px;
-  min-height: 36px;
+  width: 32px;
+  min-height: 30px;
   border-radius: 10px;
   padding: 0;
   text-transform: none;
@@ -466,7 +508,11 @@ body.state-lobby .side-panel section:first-child h2 {
 .chat-form {
   display: grid;
   grid-template-columns: 1fr auto;
-  gap: 8px;
+  gap: 6px;
+}
+
+body.state-question .chat-form input {
+  min-height: 38px;
 }
 
 .play-again {
@@ -560,16 +606,17 @@ body.state-lobby .side-panel section:first-child h2 {
   left: 50%;
   top: 50%;
   transform: translate(-50%, -50%);
-  min-width: min(420px, 82vw);
-  padding: 28px 34px;
-  border: 4px solid rgba(255, 204, 54, 0.96);
-  border-radius: 24px;
-  background: rgba(255, 236, 190, 0.95);
-  box-shadow: 0 24px 70px rgba(88, 21, 48, 0.38);
+  min-width: min(380px, 78vw);
+  padding: 24px 30px;
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  border-radius: 20px;
+  background: rgba(255, 244, 249, 0.72);
+  box-shadow: 0 22px 60px rgba(88, 21, 48, 0.26);
+  backdrop-filter: blur(14px) saturate(1.1);
   color: var(--pink-dark);
-  font-size: clamp(36px, 7vw, 72px);
+  font-size: clamp(32px, 6vw, 62px);
   text-align: center;
-  text-shadow: 0 2px 0 rgba(255, 255, 255, 0.9);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.62);
 }
 
 .confirm-modal {
@@ -599,6 +646,38 @@ body.state-lobby .side-panel section:first-child h2 {
   line-height: 1.05;
 }
 
+.final-challenge-card {
+  width: min(820px, 94vw);
+  max-height: 88vh;
+  overflow: auto;
+  text-align: left;
+}
+
+.final-challenge-card h2 {
+  margin: 0 0 14px;
+  text-align: center;
+  color: var(--pink-dark);
+  font-size: clamp(28px, 5vw, 54px);
+}
+
+.final-challenge-card p,
+.final-challenge-card li {
+  margin-bottom: 10px;
+  font-size: clamp(17px, 2vw, 24px);
+  line-height: 1.2;
+}
+
+.final-challenge-card ul {
+  margin: 0 0 12px;
+  padding-left: 24px;
+}
+
+.final-challenge-card .vote-summary {
+  text-align: center;
+  color: var(--pink-dark);
+  font-size: clamp(19px, 2.4vw, 28px);
+}
+
 .confirm-actions {
   display: flex;
   justify-content: center;
@@ -620,6 +699,23 @@ body.state-lobby .side-panel section:first-child h2 {
   50% {
     background: linear-gradient(180deg, #ffffff, #2fd65f 58%, #a7ffba);
     box-shadow: 0 0 32px rgba(47, 214, 95, 0.95);
+  }
+}
+
+@keyframes clockCountdown {
+  0% {
+    transform: scale(1);
+    filter: brightness(1);
+  }
+
+  45% {
+    transform: scale(1.08);
+    filter: brightness(1.08);
+  }
+
+  100% {
+    transform: scale(1);
+    filter: brightness(1);
   }
 }
 
@@ -652,11 +748,27 @@ body.state-lobby .side-panel section:first-child h2 {
 
   .status-bar {
     align-items: center;
+    padding-right: 66px;
   }
 
   .status-actions {
     flex-direction: column-reverse;
     align-items: flex-end;
+  }
+
+  .timer {
+    top: 8px;
+    right: 8px;
+    width: 50px;
+  }
+
+  .timer-clock {
+    max-height: 64px;
+  }
+
+  .timer span {
+    min-width: 30px;
+    font-size: 15px;
   }
 
   .status-bar h2 {

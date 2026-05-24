@@ -17,11 +17,11 @@ async def get_friend_advice(question: str, options: list[dict[str, str]]) -> str
     try:
         from pydantic_ai import Agent
 
-        model = os.getenv("PYDANTIC_AI_MODEL", "openai:gpt-5.2")
+        model = os.getenv("PYDANTIC_AI_MODEL", "openai:gpt-5.5")
         agent = Agent(
             model,
             system_prompt=(
-                "You are a funny trivia lifeline friend. Give playful, concise advice. "
+                "You are a funny trivia lifeline friend. Give playful, concise advice. Make it funny!"
                 "Do not reveal certainty unless the evidence is strong. Max 45 words."
             ),
         )

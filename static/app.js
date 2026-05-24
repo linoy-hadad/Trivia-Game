@@ -6,6 +6,7 @@ const joinForm = document.querySelector("#joinForm");
 const nicknameInput = document.querySelector("#nicknameInput");
 const phaseLabel = document.querySelector("#phaseLabel");
 const mainTitle = document.querySelector("#mainTitle");
+const timer = document.querySelector("#timer");
 const timerBox = document.querySelector("#timerBox");
 const lobbyView = document.querySelector("#lobbyView");
 const lobbyText = document.querySelector("#lobbyText");
@@ -35,11 +36,16 @@ const finishConfirmModal = document.querySelector("#finishConfirmModal");
 const finishYesBtn = document.querySelector("#finishYesBtn");
 const finishNoBtn = document.querySelector("#finishNoBtn");
 const muteBtn = document.querySelector("#muteBtn");
+const finalChallengeModal = document.querySelector("#finalChallengeModal");
+const finalChallengeYesBtn = document.querySelector("#finalChallengeYesBtn");
+const finalChallengeNoBtn = document.querySelector("#finalChallengeNoBtn");
+const finalChallengeVotes = document.querySelector("#finalChallengeVotes");
 
 let countdownInterval = null;
 let answered = false;
 let hiddenOptions = new Set();
 let lastAnswerResult = null;
+let pendingLeaderMessage = "";
 let popupTimeout = null;
 let soundEnabled = true;
 
@@ -105,6 +111,8 @@ finishYesBtn.addEventListener("click", () => {
   socket.emit("finish_game");
   resetToJoin();
 });
+finalChallengeYesBtn.addEventListener("click", () => voteFinalChallenge("yes"));
+finalChallengeNoBtn.addEventListener("click", () => voteFinalChallenge("no"));
 muteBtn.addEventListener("click", () => {
   soundEnabled = !soundEnabled;
   muteBtn.textContent = soundEnabled ? "Sound On" : "Sound Off";
@@ -167,15 +175,25 @@ socket.on("question_started", (data) => {
   hideAnswerPopup();
   feedback.textContent = "";
   mainTitle.textContent = "Choose your answer";
-  questionText.textContent = data.question;
-  questionCounter.textContent = `Question ${data.questionNumber} / ${data.totalQuestions}`;
+  questionText.textContent = data.isFinalChallenge ? `Final Challenge: ${data.question}` : data.question;
+  questionCounter.textContent = data.isFinalChallenge
+    ? "Final Challenge"
+    : `Question ${data.questionNumber} / ${data.totalQuestions}`;
   startCountdown(data.timer);
   renderAnswers(data.options);
   renderLeaderboard(data.leaderboard || []);
+  if (pendingLeaderMessage) {
+    const message = pendingLeaderMessage;
+    pendingLeaderMessage = "";
+    window.setTimeout(() => showAnswerPopup(message), 350);
+  }
 });
 
 socket.on("answer_result", (data) => {
   lastAnswerResult = data;
+  if (data.leaderboard) {
+    renderLeaderboard(data.leaderboard);
+  }
 });
 
 socket.on("help_result", (data) => {
@@ -195,6 +213,7 @@ socket.on("help_result", (data) => {
 
 socket.on("question_ended", (data) => {
   stopCountdown();
+  renderLeaderboard(data.leaderboard || []);
   document.querySelectorAll(".answer-button").forEach((button) => {
     button.disabled = true;
     if (button.dataset.optionId === data.correctOptionId) button.classList.add("correct", "blink-correct");
@@ -209,10 +228,30 @@ socket.on("question_ended", (data) => {
       showAnswerPopup("Not this time!");
     }
   }
-  renderLeaderboard(data.leaderboard || []);
 });
 
 socket.on("scoreboard_update", (data) => renderLeaderboard(data.leaderboard || []));
+socket.on("leader_changed", (data) => {
+  pendingLeaderMessage = `${data.nickname} moved to the first place!👑`;
+});
+
+socket.on("final_challenge_started", (data) => {
+  finalChallengeVotes.textContent = formatFinalChallengeVotes(data.votes);
+  finalChallengeYesBtn.disabled = false;
+  finalChallengeNoBtn.disabled = false;
+  finalChallengeModal.classList.remove("hidden");
+});
+
+socket.on("final_challenge_update", (data) => {
+  finalChallengeVotes.textContent = formatFinalChallengeVotes(data.votes);
+});
+
+socket.on("final_challenge_resolved", (data) => {
+  finalChallengeModal.classList.add("hidden");
+  if (!data.accepted) {
+    showAnswerPopup("Final Challenge skipped");
+  }
+});
 
 socket.on("game_ended", (data) => {
   stopBackgroundMusic();
@@ -223,7 +262,7 @@ socket.on("game_ended", (data) => {
   mainTitle.textContent = "Game over";
   timerBox.textContent = "0";
   renderLeaderboard(data.leaderboard || []);
-  renderFinalScoreboard(data.leaderboard || [], data.winner);
+  renderFinalScoreboard(data.leaderboard || [], data.winner, data.winnerCaption);
   scoreboardModal.classList.remove("hidden");
   playSound(sounds.good);
 });
@@ -281,16 +320,26 @@ function renderLeaderboard(rows) {
   });
 }
 
-function renderFinalScoreboard(rows, winner) {
+function renderFinalScoreboard(rows, winner, serverCaption) {
   const sortedRows = [...rows].sort((a, b) => b.score - a.score);
   const winnerName = winner?.nickname || sortedRows[0]?.nickname || "Nobody";
-  winnerCaption.textContent = `${winnerName} is the winner!`;
+  winnerCaption.textContent = serverCaption || `${winnerName} is the winner!`;
   finalScoreboard.innerHTML = "";
   sortedRows.forEach((row, index) => {
     const item = document.createElement("li");
     item.innerHTML = `<span class="rank">${index + 1}</span><span>${row.nickname}</span><strong>${row.score}</strong>`;
     finalScoreboard.appendChild(item);
   });
+}
+
+function voteFinalChallenge(vote) {
+  socket.emit("vote_final_challenge", { vote });
+  finalChallengeYesBtn.disabled = true;
+  finalChallengeNoBtn.disabled = true;
+}
+
+function formatFinalChallengeVotes(votes = {}) {
+  return `Votes: Yes ${votes.yes || 0} | No ${votes.no || 0}`;
 }
 
 function showOnly(view) {
@@ -308,12 +357,14 @@ function resetToJoin() {
   stopBackgroundMusic();
   hideAnswerPopup();
   lastAnswerResult = null;
+  pendingLeaderMessage = "";
   setPageState("join");
   finishGameBtn.classList.add("hidden");
   finishConfirmModal.classList.add("hidden");
   joinPanel.classList.remove("hidden");
   gamePanel.classList.add("hidden");
   scoreboardModal.classList.add("hidden");
+  finalChallengeModal.classList.add("hidden");
   showOnly(lobbyView);
   nicknameInput.value = "";
   chatInput.value = "";
@@ -381,9 +432,11 @@ function startCountdown(seconds) {
   stopCountdown();
   let remaining = seconds;
   timerBox.textContent = remaining;
+  updateTimerWarning(remaining);
   countdownInterval = window.setInterval(() => {
     remaining = Math.max(0, remaining - 1);
     timerBox.textContent = remaining;
+    updateTimerWarning(remaining);
     if (remaining <= 0) stopCountdown();
   }, 1000);
 }
@@ -393,4 +446,9 @@ function stopCountdown() {
     window.clearInterval(countdownInterval);
     countdownInterval = null;
   }
+  timer.classList.remove("is-ending");
+}
+
+function updateTimerWarning(remaining) {
+  timer.classList.toggle("is-ending", remaining > 0 && remaining <= 5);
 }

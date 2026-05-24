@@ -15,6 +15,7 @@ from question_store import CATEGORY_MAP, Question, QuestionStore, question_timer
 MATCHMAKING_SECONDS = 30
 CATEGORY_SECONDS = 15
 QUESTIONS_PER_GAME = 10
+FINAL_CHALLENGE_SECONDS = 15
 BASE_POINTS = 1000
 HELP_TYPES = {"fifty_fifty", "call_friend", "double_score"}
 EMOJIS = {"😀", "😂", "🔥", "👏", "🤯", "😎", "💀", "🎉", "❤️", "👍"}
@@ -63,6 +64,10 @@ class GameRoom:
     question_number: int = 0
     used_question_ids: set[int] = field(default_factory=set)
     current: CurrentQuestion | None = None
+    final_challenge_votes: dict[str, str] = field(default_factory=dict)
+    pre_challenge_winner: str | None = None
+    leader_id: str | None = None
+    final_challenge_active: bool = False
 
 
 class GameEngine:
@@ -118,6 +123,16 @@ class GameEngine:
         room.category_votes[sid] = category
         await self.emit("category_vote_update", self._vote_payload(room), room.id)
 
+    async def vote_final_challenge(self, sid: str, vote: str) -> None:
+        room = self._room_for_sid(sid)
+        if not room or sid not in room.players or room.players[sid].is_bot:
+            return
+        vote = vote.lower().strip()
+        if vote not in {"yes", "no"}:
+            return
+        room.final_challenge_votes[sid] = vote
+        await self.emit("final_challenge_update", self._final_challenge_payload(room), room.id)
+
     async def submit_answer(self, sid: str, option_id: str) -> None:
         room = self._room_for_sid(sid)
         if not room or not room.current or sid not in room.players:
@@ -126,7 +141,12 @@ class GameEngine:
         if record:
             await self.emit(
                 "answer_result",
-                {"correct": record.correct, "points": record.points, "score": room.players[sid].score},
+                {
+                    "correct": record.correct,
+                    "points": record.points,
+                    "score": room.players[sid].score,
+                    "leaderboard": self._leaderboard(room),
+                },
                 sid,
             )
             await self.emit("scoreboard_update", {"leaderboard": self._leaderboard(room)}, room.id)
@@ -137,7 +157,7 @@ class GameEngine:
             return
         player = room.players[sid]
         if player.is_bot or not player.helps.get(help_type):
-            await self.emit("help_result", {"helpType": help_type, "error": "This help is not available."}, sid)
+            await self.emit("help_result", {"helpType": help_type, "error": "You already used this help!"}, sid)
             return
 
         player.helps[help_type] = False
@@ -208,21 +228,37 @@ class GameEngine:
         )
         for _ in range(QUESTIONS_PER_GAME):
             await self._run_question(room)
+        room.pre_challenge_winner = self._leaderboard(room)[0]["nickname"] if room.players else None
+        accepted = await self._run_final_challenge_vote(room)
+        if accepted:
+            await self._run_question(room, is_final_challenge=True)
+        winner_caption = self._winner_caption(room)
         await self.emit(
             "game_ended",
-            {"leaderboard": self._leaderboard(room), "winner": self._leaderboard(room)[0] if room.players else None},
+            {
+                "leaderboard": self._leaderboard(room),
+                "winner": self._leaderboard(room)[0] if room.players else None,
+                "winnerCaption": winner_caption,
+            },
             room.id,
         )
         for sid in list(room.players):
             self.sid_to_room.pop(sid, None)
         self.rooms.pop(room.id, None)
 
-    async def _run_question(self, room: GameRoom) -> None:
-        room.question_number += 1
-        question = self.store.get_question(room.category, room.difficulty, room.used_question_ids)
+    async def _run_question(self, room: GameRoom, is_final_challenge: bool = False) -> None:
+        if is_final_challenge:
+            room.final_challenge_active = True
+            question_number = QUESTIONS_PER_GAME + 1
+            question = self.store.get_question(room.category, 10, room.used_question_ids)
+            timer = 10
+        else:
+            room.question_number += 1
+            question_number = room.question_number
+            question = self.store.get_question(room.category, room.difficulty, room.used_question_ids)
+            timer = question_timer(question.difficulty)
         room.used_question_ids.add(question.id)
         options, correct_option_id = shuffled_options(question)
-        timer = question_timer(question.difficulty)
         room.current = CurrentQuestion(question, options, correct_option_id, timer, time.monotonic())
         for player in room.players.values():
             player.double_active = False
@@ -230,13 +266,14 @@ class GameEngine:
         await self.emit(
             "question_started",
             {
-                "questionNumber": room.question_number,
-                "totalQuestions": QUESTIONS_PER_GAME,
+                "questionNumber": question_number,
+                "totalQuestions": QUESTIONS_PER_GAME + (1 if is_final_challenge else 0),
                 "question": question.text,
                 "difficulty": question.difficulty,
                 "timer": timer,
                 "options": options,
                 "leaderboard": self._leaderboard(room),
+                "isFinalChallenge": is_final_challenge,
             },
             room.id,
         )
@@ -246,9 +283,11 @@ class GameEngine:
                 asyncio.create_task(self._bot_answer(room, bot_id, timer, question.difficulty))
 
         await asyncio.sleep(timer)
-        await self._end_question(room)
+        await self._end_question(room, is_final_challenge=is_final_challenge)
+        if is_final_challenge:
+            room.final_challenge_active = False
 
-    async def _end_question(self, room: GameRoom) -> None:
+    async def _end_question(self, room: GameRoom, is_final_challenge: bool = False) -> None:
         current = room.current
         if not current:
             return
@@ -262,7 +301,9 @@ class GameEngine:
                 correct_humans += 1
 
         previous_difficulty = room.difficulty
-        room.difficulty = adapt_difficulty(room.difficulty, correct_humans, human_count)
+        if not is_final_challenge:
+            room.difficulty = adapt_difficulty(room.difficulty, correct_humans, human_count)
+        leaderboard = self._leaderboard(room)
         await self.emit(
             "question_ended",
             {
@@ -278,12 +319,14 @@ class GameEngine:
                     for pid, answer in current.answers.items()
                     if pid in room.players
                 },
-                "leaderboard": self._leaderboard(room),
+                "leaderboard": leaderboard,
                 "nextDifficulty": room.difficulty,
                 "previousDifficulty": previous_difficulty,
+                "isFinalChallenge": is_final_challenge,
             },
             room.id,
         )
+        await self._maybe_emit_leader_change(room, leaderboard, is_final_challenge)
         room.current = None
         await asyncio.sleep(2)
 
@@ -307,7 +350,7 @@ class GameEngine:
         player = room.players[player_id]
         response_time = max(0.0, min(current.timer, answered_at - current.started_at))
         correct = option_id == current.correct_option_id
-        points_possible = BASE_POINTS * (2 if player.double_active else 1)
+        points_possible = BASE_POINTS * (2 if player.double_active or room.final_challenge_active else 1)
         points = calculate_points(response_time, current.timer, points_possible, correct)
         player.score += points
         record = AnswerRecord(option_id, response_time, correct, points)
@@ -356,6 +399,44 @@ class GameEngine:
             "players": self._players_payload(room),
         }
 
+    async def _run_final_challenge_vote(self, room: GameRoom) -> bool:
+        room.final_challenge_votes = {}
+        await self.emit("final_challenge_started", self._final_challenge_payload(room), room.id)
+        await asyncio.sleep(FINAL_CHALLENGE_SECONDS)
+        accepted = final_challenge_accepted(room.final_challenge_votes, room.players)
+        await self.emit("final_challenge_resolved", {"accepted": accepted}, room.id)
+        return accepted
+
+    def _final_challenge_payload(self, room: GameRoom) -> dict[str, Any]:
+        counts = Counter(room.final_challenge_votes.values())
+        return {
+            "seconds": FINAL_CHALLENGE_SECONDS,
+            "votes": {"yes": counts.get("yes", 0), "no": counts.get("no", 0)},
+        }
+
+    async def _maybe_emit_leader_change(
+        self,
+        room: GameRoom,
+        leaderboard: list[dict[str, Any]],
+        is_final_challenge: bool,
+    ) -> None:
+        if not leaderboard:
+            return
+        new_leader_id = leaderboard[0]["id"]
+        old_leader_id = room.leader_id
+        room.leader_id = new_leader_id
+        if room.question_number < 2 and not is_final_challenge:
+            return
+        if old_leader_id and old_leader_id != new_leader_id:
+            await self.emit("leader_changed", {"nickname": leaderboard[0]["nickname"]}, room.id)
+
+    def _winner_caption(self, room: GameRoom) -> str:
+        leaderboard = self._leaderboard(room)
+        winner = leaderboard[0]["nickname"] if leaderboard else "Nobody"
+        if room.pre_challenge_winner and room.pre_challenge_winner != winner:
+            return f"{winner} is now the winner! Wow this question was hard for {room.pre_challenge_winner}..."
+        return f"{winner} is the winner!"
+
     async def _emit_lobby_update(self) -> None:
         names = [player.nickname for player in self.waiting.values()]
         await self.emit(
@@ -383,6 +464,13 @@ def adapt_difficulty(current: int, correct_humans: int, human_count: int) -> int
     if human_count and correct_humans > human_count / 2:
         return min(10, current + 1)
     return current
+
+
+def final_challenge_accepted(votes: dict[str, str], players: dict[str, Player]) -> bool:
+    human_ids = {pid for pid, player in players.items() if not player.is_bot}
+    yes_votes = sum(1 for pid, vote in votes.items() if pid in human_ids and vote == "yes")
+    no_votes = sum(1 for pid, vote in votes.items() if pid in human_ids and vote == "no")
+    return yes_votes > no_votes
 
 
 def bot_answer_delay(timer: int, rng: random.Random | None = None) -> float:

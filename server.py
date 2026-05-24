@@ -63,6 +63,11 @@ async def vote_category(sid: str, data: dict[str, Any]) -> None:
 
 
 @sio.event
+async def vote_final_challenge(sid: str, data: dict[str, Any]) -> None:
+    await engine.vote_final_challenge(sid, str(data.get("vote", "")))
+
+
+@sio.event
 async def submit_answer(sid: str, data: dict[str, Any]) -> None:
     await engine.submit_answer(sid, str(data.get("optionId", "")))
 
